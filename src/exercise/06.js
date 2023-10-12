@@ -86,6 +86,22 @@ function useAppDispatch() {
   return context
 }
 
+function withStateSlice(Component, slice) {
+  const MemoComponent = React.memo(Component)
+
+  function Wrapper(props, ref) {
+    const state = useAppState()
+
+    return <MemoComponent ref={ref} state={slice(state, props)} {...props} />
+  }
+
+  Wrapper.displayName = `withStateSlice(${
+    Component.displayName || Component.name
+  })`
+
+  return React.memo(React.forwardRef(Wrapper))
+}
+
 function Grid() {
   const dispatch = useAppDispatch()
   const [rows, setRows] = useDebouncedState(50)
@@ -105,7 +121,7 @@ function Grid() {
 }
 Grid = React.memo(Grid)
 
-function CellImpl({cell, row, column}) {
+function Cell({state: cell, row, column}) {
   const dispatch = useAppDispatch()
 
   const handleClick = () => dispatch({type: 'UPDATE_GRID_CELL', row, column})
@@ -123,16 +139,10 @@ function CellImpl({cell, row, column}) {
     </button>
   )
 }
-CellImpl = React.memo(CellImpl)
-
-function Cell({row, column}) {
-  const state = useAppState()
-
-  const cell = state.grid[row][column]
-
-  return <CellImpl cell={cell} row={row} column={column} />
-}
-Cell = React.memo(Cell)
+Cell = withStateSlice(
+  Cell,
+  (state, props) => state.grid[props.row][props.column],
+)
 
 function DogNameInput() {
   const [dogName, dispatch] = useDogContext()
