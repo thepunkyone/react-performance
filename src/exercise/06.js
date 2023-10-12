@@ -10,20 +10,17 @@ import {
   updateGridCellState,
 } from '../utils'
 
-const AppStateContext = React.createContext()
-const AppDispatchContext = React.createContext()
+const DogContext = React.createContext()
+const GridContext = React.createContext()
 
 const initialGrid = Array.from({length: 100}, () =>
   Array.from({length: 100}, () => Math.random() * 100),
 )
 
-function appReducer(state, action) {
+function dogReducer(state, action) {
   switch (action.type) {
-    case 'UPDATE_GRID_CELL': {
-      return {...state, grid: updateGridCellState(state.grid, action)}
-    }
-    case 'UPDATE_GRID': {
-      return {...state, grid: updateGridState(state.grid)}
+    case 'TYPED_IN_DOG_INPUT': {
+      return action.dogName
     }
     default: {
       throw new Error(`Unhandled action type: ${action.type}`)
@@ -31,39 +28,53 @@ function appReducer(state, action) {
   }
 }
 
-function AppProvider({children}) {
-  const [state, dispatch] = React.useReducer(appReducer, {
-    grid: initialGrid,
-  })
-  return (
-    <AppStateContext.Provider value={state}>
-      <AppDispatchContext.Provider value={dispatch}>
-        {children}
-      </AppDispatchContext.Provider>
-    </AppStateContext.Provider>
-  )
+function gridReducer(state, action) {
+  switch (action.type) {
+    case 'UPDATE_GRID_CELL': {
+      return updateGridCellState(state, action)
+    }
+    case 'UPDATE_GRID': {
+      return updateGridState(state)
+    }
+    default: {
+      throw new Error(`Unhandled action type: ${action.type}`)
+    }
+  }
 }
 
-function useAppState() {
-  const context = React.useContext(AppStateContext)
+function DogProvider({children}) {
+  const value = React.useReducer(dogReducer, '')
+
+  return <DogContext.Provider value={value}>{children}</DogContext.Provider>
+}
+
+function GridProvider({children}) {
+  const value = React.useReducer(gridReducer, initialGrid)
+
+  return <GridContext.Provider value={value}>{children}</GridContext.Provider>
+}
+
+function useDogContext() {
+  const context = React.useContext(DogContext)
   if (!context) {
-    throw new Error('useAppState must be used within the AppProvider')
+    throw new Error('useDogContext must be used within the DogProvider')
   }
   return context
 }
 
-function useAppDispatch() {
-  const context = React.useContext(AppDispatchContext)
+function useGridContext() {
+  const context = React.useContext(GridContext)
   if (!context) {
-    throw new Error('useAppDispatch must be used within the AppProvider')
+    throw new Error('useGridContext must be used within the GridProvider')
   }
   return context
 }
 
 function Grid() {
-  const dispatch = useAppDispatch()
+  const [, dispatch] = useGridContext()
   const [rows, setRows] = useDebouncedState(50)
   const [columns, setColumns] = useDebouncedState(50)
+
   const updateGridData = () => dispatch({type: 'UPDATE_GRID'})
   return (
     <AppGrid
@@ -79,9 +90,9 @@ function Grid() {
 Grid = React.memo(Grid)
 
 function Cell({row, column}) {
-  const state = useAppState()
-  const cell = state.grid[row][column]
-  const dispatch = useAppDispatch()
+  const [state, dispatch] = useGridContext()
+
+  const cell = state[row][column]
   const handleClick = () => dispatch({type: 'UPDATE_GRID_CELL', row, column})
   return (
     <button
@@ -99,12 +110,11 @@ function Cell({row, column}) {
 Cell = React.memo(Cell)
 
 function DogNameInput() {
-  const [dogName, setDogName] = React.useState('')
-
+  const [dogName, dispatch] = useDogContext()
   function handleChange(event) {
     const newDogName = event.target.value
 
-    setDogName(newDogName)
+    dispatch({type: 'TYPED_IN_DOG_INPUT', dogName: newDogName})
   }
 
   return (
@@ -129,12 +139,15 @@ function App() {
   return (
     <div className="grid-app">
       <button onClick={forceRerender}>force rerender</button>
-      <AppProvider>
-        <div>
+
+      <div>
+        <DogProvider>
           <DogNameInput />
+        </DogProvider>
+        <GridProvider>
           <Grid />
-        </div>
-      </AppProvider>
+        </GridProvider>
+      </div>
     </div>
   )
 }
